@@ -18,13 +18,24 @@ using namespace std;
 
 int main(int argc, char* const argv[]) {
 
+    char userChoice = ' ';
+    int userId = 0;
     // Create the EmployeeRelation file from Employee.csv
     StorageBufferManager manager("EmployeeRelation");
     manager.createFromFile("Employee.csv");
-    manager.findRecordById(11432120);
+    //manager.findRecordById(11432120);
     
     // Loop to lookup IDs until user is ready to quit
-    
+    while(userChoice != 'n')
+    {
+      cout << "Please enter a Employee ID to search: ";
+      cin >> userId;
+      manager.findRecordById(userId);
+
+      cout << "Do you want to search again[y,n]: ";
+      cin >> userChoice;
+      userChoice = tolower(userChoice);
+    }
     /*
 
     string mytest;

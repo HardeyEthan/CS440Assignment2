@@ -235,8 +235,6 @@ public:
         int fileLength = inputFile.tellg();
         inputFile.seekg(0);
 
-
-
         Page page1Block;
 
         string inputBuffer;
@@ -252,6 +250,7 @@ public:
         manIdBuffer[8] = '\0';
 
         page1Block.buffer = pageDataBuffer;
+        //cout << page1Block.buffer << endl;
 
         stringstream stringStream; 
         stringstream padCleaner;
@@ -267,15 +266,8 @@ public:
 
         stringStream << page1Block.buffer;
 
-
             while(true)
             {           
-                if(runningTotal > 4090)
-                {
-                    //cout << "WE BREAKING OUTTA HERE" << endl;
-                    break;
-                }
-
                 getline(stringStream, inputBuffer, '[');
                 runningTotal += inputBuffer.length() + 1;
                 
@@ -313,6 +305,15 @@ public:
                     cout << "RECORD MANAGER ID: " << manIdConverted << endl;
 
                     stringStream.seekg(currPos);
+                }else
+                {
+                    stringStream.seekg(currPos);
+                }
+
+                if(runningTotal > 4090)
+                {
+                    //cout << "WE BREAKING OUTTA HERE" << endl;
+                    break;
                 }
 
                 
