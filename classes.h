@@ -2,8 +2,12 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <bitset>
+#include <stdio.h>
+#include <string.h>
+
 using namespace std;
 
 class Record {
@@ -18,6 +22,14 @@ public:
         manager_id = stoi(fields[3]);
     }
 
+    Record()
+    {
+        id = 0;
+        name = "NULL";
+        bio = "NULL";
+        manager_id = 0;
+    }
+
     void print() {
         cout << "\tID: " << id << "\n";
         cout << "\tNAME: " << name << "\n";
@@ -29,11 +41,9 @@ public:
 
 class Page {
 public:
-
-  string buffer;
-  int runningDataOffset;
-  int runningIndexOffset;
-
+    string buffer;
+    int runningDataOffset;
+    int runningIndexOffset;
 };
 
 
@@ -52,7 +62,7 @@ private:
 
     void dumpPages(){
     
-        cout << "Dumping pages" << endl;
+        //cout << "Dumping pages" << endl;
 
         //open the data file
         ofstream outFile;
@@ -70,27 +80,27 @@ private:
         //close the outfile
         outFile.close();
 
-        cout << "Done dumping" << endl;
+        //cout << "Done dumping" << endl;
+        //cout << "Done dumping" << endl;
     }
 
     // Insert new record 
     void insertRecord(Record record) {
     
         //used to determine if the record finds a spot or not
-    
         if(numRecords == 0){
-          //initialize the buffers
-          page1block.runningDataOffset = 0;
-          page1block.runningIndexOffset = 0;
-          page1block.buffer.append(BLOCK_SIZE, ' ');
+            //initialize the buffers
+            page1block.runningDataOffset = 0;
+            page1block.runningIndexOffset = 0;
+            page1block.buffer.append(BLOCK_SIZE, ' ');
 
         }
     
         numRecords++;
-        cout << numRecords << endl;
+        //cout << numRecords << endl;
 
         //build the record string
-        mydata = "4$" + to_string(record.id) + "$" + record.name + "$" + record.bio + "$" + to_string(record.id) + "$";
+        mydata = to_string(record.id) + "$" + record.name + "$" + record.bio + "$" + to_string(record.id) + "$";
         
         //build the padded string for the slot directory
         myindex = "[****,***]";
@@ -103,37 +113,37 @@ private:
         
         if((page1block.runningDataOffset + page1block.runningIndexOffset) <= BLOCK_SIZE){
 
-          //send the data into the buffer
-          page1block.buffer.replace(page1block.runningDataOffset - mydata.length(), mydata.length(), mydata);
+            //send the data into the buffer
+            page1block.buffer.replace(page1block.runningDataOffset - mydata.length(), mydata.length(), mydata);
 
-          //send the padded index into the buffer
-          page1block.buffer.replace(BLOCK_SIZE - page1block.runningIndexOffset, myindex.length(), myindex);
+            //send the padded index into the buffer
+            page1block.buffer.replace(BLOCK_SIZE - page1block.runningIndexOffset, myindex.length(), myindex);
             
         } 
         //if our new record could not find a free spot, send the page to the data file and clear it to make room for the homeless record
         else{
-          
-          dumpPages();
-          
-          //put the record that just came in at the first position in the new block
+            dumpPages();
+            
+            //put the record that just came in at the first position in the new block
+            page1block.buffer = page1block.buffer + "4" + to_string(record.id) + "$" + record.name + "$" + record.bio + "$" + to_string(record.manager_id) + "\n";  
+            
+            //build the record string
+            mydata = to_string(record.id) + "$" + record.name + "$" + record.bio + "$" + to_string(record.id) + "$";
+            
+            //build the padded string for the slot directory
+            myindex = "[****,***]";
+            myindex.replace(1, to_string(page1block.runningDataOffset).length(), to_string(page1block.runningDataOffset));
+            myindex.replace(6, to_string(mydata.length()).length(), to_string(mydata.length()));
 
-          //build the record string
-          mydata = "4$" + to_string(record.id) + "$" + record.name + "$" + record.bio + "$" + to_string(record.id) + "$";
-          
-          //build the padded string for the slot directory
-          myindex = "[****,***]";
-          myindex.replace(1, to_string(page1block.runningDataOffset).length(), to_string(page1block.runningDataOffset));
-          myindex.replace(6, to_string(mydata.length()).length(), to_string(mydata.length()));
+            //determine how much this new record/slot will increase the data/index offsets
+            page1block.runningDataOffset = page1block.runningDataOffset + mydata.length();
+            page1block.runningIndexOffset = page1block.runningIndexOffset + myindex.length();
 
-          //determine how much this new record/slot will increase the data/index offsets
-          page1block.runningDataOffset = page1block.runningDataOffset + mydata.length();
-          page1block.runningIndexOffset = page1block.runningIndexOffset + myindex.length();
+            //send the data into the buffer
+            page1block.buffer.replace(page1block.runningDataOffset - mydata.length(), mydata.length(), mydata);
 
-          //send the data into the buffer
-          page1block.buffer.replace(page1block.runningDataOffset - mydata.length(), mydata.length(), mydata);
-
-          //send the padded index into the buffer
-          page1block.buffer.replace(BLOCK_SIZE - page1block.runningIndexOffset, myindex.length(), myindex);
+            //send the padded index into the buffer
+            page1block.buffer.replace(BLOCK_SIZE - page1block.runningIndexOffset, myindex.length(), myindex);
           
         }
 
@@ -215,10 +225,152 @@ public:
 
     }
 
-    // Given an ID, find the relevant record and print it
-    Record findRecordById(int id) {
-        
-        //grab 3 pages from the file and search them, if unsuccessful, loop
+    //Given an ID, find the relevant record and print it
+    void findRecordById(int id) {
 
+        ifstream inputFile; 
+        inputFile.open("EmployeeRelation.dat");
+
+        inputFile.seekg(0, ios::end);
+        int fileLength = inputFile.tellg();
+        inputFile.seekg(0);
+
+
+
+        Page page1Block;
+
+        string inputBuffer;
+        string readingString;
+        int runningTotal = 0;
+
+        char* pageDataBuffer = new char[BLOCK_SIZE+1];
+        pageDataBuffer[BLOCK_SIZE] = '\0'; 
+
+        inputFile.read(pageDataBuffer, BLOCK_SIZE);
+
+        char* manIdBuffer = new char[9];
+        manIdBuffer[8] = '\0';
+
+        page1Block.buffer = pageDataBuffer;
+
+        stringstream stringStream; 
+        stringstream padCleaner;
+        streampos currPos;
+
+        string padCleaned;
+        int recordsIndex = 0;
+
+        string manIdConverted;
+        int idOffset = 0;
+        bool doneSearching;
+        bool pageTotalChecker;
+
+        stringStream << page1Block.buffer;
+
+
+            while(true)
+            {           
+                if(runningTotal > 4090)
+                {
+                    //cout << "WE BREAKING OUTTA HERE" << endl;
+                    break;
+                }
+
+                getline(stringStream, inputBuffer, '[');
+                runningTotal += inputBuffer.length() + 1;
+                
+                getline(stringStream, inputBuffer, ',');
+                runningTotal += inputBuffer.length() + 1;
+
+                padCleaner << inputBuffer;
+                getline(padCleaner, padCleaned, '*');
+                idOffset = stoi(padCleaned);
+
+                padCleaner.clear();
+
+                getline(stringStream, inputBuffer, ']');
+                runningTotal += inputBuffer.length() + 1;
+            
+                padCleaner << inputBuffer;
+                getline(padCleaner, padCleaned, '*');
+
+                padCleaner.clear();
+
+                currPos = stringStream.tellg();
+                stringStream.seekg(idOffset);
+
+                getline(stringStream, readingString, '$');
+                if(stoi(readingString) == id)
+                {
+                    cout << "RECORD ID: " << readingString << "   ";
+                    getline(stringStream, readingString, '$');
+                    cout << "RECORD NAME: " << readingString << "   "; 
+                    getline(stringStream, readingString, '$');
+                    cout << "RECORD BIO: " << readingString << "   "; 
+                    stringStream.read(manIdBuffer, 8);
+                    
+                    manIdConverted = manIdBuffer;
+                    cout << "RECORD MANAGER ID: " << manIdConverted << endl;
+
+                    stringStream.seekg(currPos);
+                }
+
+                
+                //cout << fileOffsets[recordsIndex] << ',' << recordSizes[recordsIndex] << endl;
+                recordsIndex++;
+            }
+
+        /*DELIMITED INPUT
+            while(page1Block.runningDataOffset <= BLOCK_SIZE)
+            {
+                getline(inputFile, inputBuffer, '$');
+                page1Block.runningDataOffset += inputBuffer.length();
+                //cout << page1Block.runningDataOffset << endl;
+
+                oldpos = inputFile.tellg();
+
+                page1Block.buffer.replace(page1Block.runningDataOffset - inputBuffer.length(), inputBuffer.length(), inputBuffer);
+
+                getline(inputFile, inputBuffer, '$');
+                if(page1Block.runningDataOffset + inputBuffer.length() > BLOCK_SIZE)
+                {
+                    inputFile.seekg(oldpos);
+                    break;
+                }else
+                {
+                    inputFile.seekg(oldpos);
+                }
+            }
+        */
+
+        /*TESTING STUFF
+            cout << page1Block.buffer << endl;
+
+            cout << stringStream.str() << endl;
+
+
+            char* pageDataBuffer = new char[BLOCK_SIZE];
+            string pageData;
+            inputFile.read(pageDataBuffer, BLOCK_SIZE);
+
+            pageData = pageDataBuffer;
+            cout << pageData << endl;
+
+            delete[] pageDataBuffer;
+
+            for(int i = 0; i < numRecords; i++)
+            {
+                getline(inputFile, inputBuffer, '[');
+                getline(inputFile, inputBuffer, ',');
+                fileOffsets[i] = stoi(inputBuffer);
+                getline(inputFile, inputBuffer, ']');
+                recordSizes[i] = stoi(inputBuffer);
+
+
+                cout << fileOffsets[i] << ',' << recordSizes[i] << endl;
+            }
+        */
+        
+        delete[] pageDataBuffer;
     }
 };
